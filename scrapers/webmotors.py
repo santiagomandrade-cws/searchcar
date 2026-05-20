@@ -1,60 +1,87 @@
 import httpx
-from bs4 import BeautifulSoup
-from .base import BaseScraper, CarListing
+from scrapers.base import BaseScraper, CarListing
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.webmotors.com.br/carros/estoque",
+    "Origin": "https://www.webmotors.com.br",
+}
 
 
 class WebMotorsScraper(BaseScraper):
-    BASE_URL = "https://www.webmotors.com.br/carros/estoque"
+    _API = "https://www.webmotors.com.br/api/search/car"
 
     async def buscar(self) -> list[CarListing]:
-        params = {}
+        partes = ["carros", "estoque"]
         if self.marca:
-            params["marca1"] = self.marca.upper()
+            partes.append(self.marca.lower().replace(" ", "-"))
         if self.modelo:
-            params["modelo1"] = self.modelo.upper()
-        if self.ano_min:
-            params["ano1"] = self.ano_min
-        if self.ano_max:
-            params["ano2"] = self.ano_max
+            partes.append(self.modelo.lower().replace(" ", "-"))
+        search_url = "https://www.webmotors.com.br/" + "/".join(partes) + "/"
+
+        params: dict = {
+            "url": search_url,
+            "actualPage": 1,
+            "displayPerPage": 24,
+            "order": 1,
+            "showMenu": "true",
+            "showCount": "true",
+            "showBreadCrumb": "true",
+            "testAB": "false",
+            "returnFacets": "false",
+        }
         if self.preco_max:
-            params["preco2"] = int(self.preco_max)
+            params["priceMax"] = int(self.preco_max)
+        if self.ano_min:
+            params["yearMin"] = self.ano_min
+        if self.ano_max:
+            params["yearMax"] = self.ano_max
+        if self.km_max:
+            params["mileageMax"] = self.km_max
+        if self.regiao:
+            params["state"] = self.regiao.upper()
 
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
+            r = await client.get(self._API, params=params)
+            r.raise_for_status()
+            data = r.json()
 
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(self.BASE_URL, params=params, headers=headers)
-            resp.raise_for_status()
+        results = []
+        for item in data.get("SearchResults", []):
+            spec = item.get("Specification", {})
+            preco = item.get("Prices", {}).get("Price")
+            km = spec.get("Mileage")
+            ano = spec.get("YearFabrication")
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        resultados = []
-
-        for card in soup.select("div[class*='card-advertisement']")[:20]:
-            try:
-                titulo_el = card.select_one("[class*='title']")
-                preco_el = card.select_one("[class*='price']")
-                link_el = card.select_one("a[href]")
-                img_el = card.select_one("img[src]")
-
-                titulo = titulo_el.get_text(strip=True) if titulo_el else "—"
-                preco_txt = preco_el.get_text(strip=True).replace("R$", "").replace(".", "").replace(",", ".").strip() if preco_el else None
-                preco = float(preco_txt) if preco_txt and preco_txt.replace(".", "").isdigit() else None
-                url = link_el["href"] if link_el else ""
-                if url and not url.startswith("http"):
-                    url = "https://www.webmotors.com.br" + url
-
-                resultados.append(CarListing(
-                    titulo=titulo,
-                    preco=preco,
-                    ano=None,
-                    marca=self.marca,
-                    modelo=self.modelo,
-                    km=None,
-                    cidade=None,
-                    url=url,
-                    fonte="WebMotors",
-                    imagem=img_el["src"] if img_el else None,
-                ))
-            except Exception:
+            if self.preco_max and preco and preco > self.preco_max:
+                continue
+            if self.km_max and km and km > self.km_max:
+                continue
+            if self.ano_min and ano and ano < self.ano_min:
+                continue
+            if self.ano_max and ano and ano > self.ano_max:
                 continue
 
-        return resultados
+            imgs = item.get("Images", [])
+            imagem = imgs[0].get("Link") if imgs else None
+            uid = item.get("UniqueId", "")
+            url = f"https://www.webmotors.com.br/comprar/{uid}" if uid else ""
+
+            results.append(CarListing(
+                titulo=spec.get("Title", ""),
+                preco=preco,
+                ano=ano,
+                marca=self.marca,
+                modelo=self.modelo,
+                km=km,
+                cor=spec.get("Color"),
+                cidade=item.get("City"),
+                estado=item.get("State"),
+                url=url,
+                fonte="WebMotors",
+                imagem=imagem,
+                publicado_em=None,
+            ))
+
+        return results

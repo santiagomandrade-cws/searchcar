@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 
@@ -10,19 +11,33 @@ class CarListing:
     marca: str
     modelo: str
     km: Optional[int]
+    cor: Optional[str]
     cidade: Optional[str]
+    estado: Optional[str]
     url: str
     fonte: str
     imagem: Optional[str] = None
+    publicado_em: Optional[datetime] = None
 
 
 class BaseScraper:
-    def __init__(self, marca: str = "", modelo: str = "", ano_min: int = None, ano_max: int = None, preco_max: float = None):
+    def __init__(
+        self,
+        marca: str = "",
+        modelo: str = "",
+        ano_min: int = None,
+        ano_max: int = None,
+        preco_max: float = None,
+        km_max: int = None,
+        regiao: str = None,
+    ):
         self.marca = marca
         self.modelo = modelo
         self.ano_min = ano_min
         self.ano_max = ano_max
         self.preco_max = preco_max
+        self.km_max = km_max
+        self.regiao = regiao
 
     async def buscar(self) -> list[CarListing]:
         raise NotImplementedError

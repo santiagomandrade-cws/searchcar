@@ -1,62 +1,122 @@
 import httpx
 from bs4 import BeautifulSoup
-from .base import BaseScraper, CarListing
+from scrapers.base import BaseScraper, CarListing
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "pt-BR,pt;q=0.9",
+}
+
+_SELECTORS_CARD = ["li.anuncio", "article.card-anuncio", "div[class*='resultado']", "li[class*='anuncio']"]
+_SELECTORS_TITULO = ["h2", "h3", ".titulo", "[class*='titulo']", "[class*='title']"]
+_SELECTORS_PRECO = [".preco", "[class*='preco']", "[class*='price']", "[class*='valor']"]
+_SELECTORS_KM = [".km", "[class*='km']", "[class*='quilometragem']"]
+_SELECTORS_LOCAL = [".cidade", "[class*='cidade']", "[class*='local']"]
+_SELECTORS_ANO = [".ano", "[class*='ano']", "[class*='year']"]
 
 
 class ICarrosScraper(BaseScraper):
-    BASE_URL = "https://www.icarros.com.br/ache/listaanuncios.jsp"
+    _URL = "https://www.icarros.com.br/ache/listaanuncios.jsp"
 
     async def buscar(self) -> list[CarListing]:
-        params = {"sop": "lis_99-ord_1-pag_1"}
+        params: dict = {"sop": "lis_99-ord_1-pag_1"}
         if self.marca:
-            params["marca"] = self.marca
+            params["mar_id"] = self.marca
         if self.modelo:
-            params["modelo"] = self.modelo
+            params["mod_id"] = self.modelo
         if self.preco_max:
             params["precoate"] = int(self.preco_max)
         if self.ano_min:
             params["anofab"] = self.ano_min
+        if self.ano_max:
+            params["anofabate"] = self.ano_max
+        if self.km_max:
+            params["kmate"] = self.km_max
+        if self.regiao:
+            params["uf"] = self.regiao.upper()
 
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        async with httpx.AsyncClient(timeout=25, headers=_HEADERS, follow_redirects=True) as client:
+            r = await client.get(self._URL, params=params)
+            r.raise_for_status()
 
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(self.BASE_URL, params=params, headers=headers)
-            resp.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        resultados = []
+        cards = []
+        for sel in _SELECTORS_CARD:
+            cards = soup.select(sel)
+            if cards:
+                break
 
-        for card in soup.select("li.anuncio")[:20]:
+        results = []
+        for card in cards[:24]:
             try:
-                titulo_el = card.select_one("h2") or card.select_one(".titulo")
-                preco_el = card.select_one(".preco") or card.select_one("[class*='preco']")
-                link_el = card.select_one("a[href]")
-                img_el = card.select_one("img[src]")
-                km_el = card.select_one(".km") or card.select_one("[class*='km']")
-                local_el = card.select_one(".cidade") or card.select_one("[class*='cidade']")
+                titulo = _text(card, _SELECTORS_TITULO)
+                if not titulo:
+                    continue
 
-                titulo = titulo_el.get_text(strip=True) if titulo_el else "—"
-                preco_txt = preco_el.get_text(strip=True).replace("R$", "").replace(".", "").replace(",", ".").strip() if preco_el else None
-                preco = float(preco_txt) if preco_txt and preco_txt.replace(".", "").isdigit() else None
-                km_txt = km_el.get_text(strip=True).replace(".", "").replace("km", "").strip() if km_el else None
-                km = int(km_txt) if km_txt and km_txt.isdigit() else None
-                url = link_el["href"] if link_el else ""
+                preco = _preco(_text(card, _SELECTORS_PRECO))
+                km = _int(_text(card, _SELECTORS_KM))
+                ano = _int(_text(card, _SELECTORS_ANO))
+                cidade = _text(card, _SELECTORS_LOCAL)
+
+                if self.preco_max and preco and preco > self.preco_max:
+                    continue
+                if self.km_max and km and km > self.km_max:
+                    continue
+                if self.ano_min and ano and ano < self.ano_min:
+                    continue
+                if self.ano_max and ano and ano > self.ano_max:
+                    continue
+
+                link = card.select_one("a[href]")
+                url = link.get("href", "") if link else ""
                 if url and not url.startswith("http"):
                     url = "https://www.icarros.com.br" + url
 
-                resultados.append(CarListing(
+                img = card.select_one("img[src], img[data-src]")
+                imagem = (img.get("src") or img.get("data-src")) if img else None
+
+                results.append(CarListing(
                     titulo=titulo,
                     preco=preco,
-                    ano=None,
+                    ano=ano,
                     marca=self.marca,
                     modelo=self.modelo,
                     km=km,
-                    cidade=local_el.get_text(strip=True) if local_el else None,
+                    cor=None,
+                    cidade=cidade,
+                    estado=self.regiao,
                     url=url,
                     fonte="iCarros",
-                    imagem=img_el["src"] if img_el else None,
+                    imagem=imagem,
+                    publicado_em=None,
                 ))
             except Exception:
                 continue
 
-        return resultados
+        return results
+
+
+def _text(card, selectors: list) -> str | None:
+    for sel in selectors:
+        el = card.select_one(sel)
+        if el:
+            return el.get_text(strip=True)
+    return None
+
+
+def _preco(s: str | None) -> float | None:
+    if not s:
+        return None
+    try:
+        return float(s.replace("R$", "").replace(".", "").replace(",", ".").replace(" ", "").strip())
+    except ValueError:
+        return None
+
+
+def _int(s: str | None) -> int | None:
+    if not s:
+        return None
+    d = "".join(filter(str.isdigit, s))
+    return int(d) if d else None

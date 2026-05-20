@@ -3,285 +3,866 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>SearchCar</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --surface: #1a1f2e; --border: #2a2f3e;
+      --text: #e0e0e0; --muted: #546e7a; --accent: #4fc3f7;
+      --green: #4caf50; --yellow: #ffb300; --orange: #ff7043; --red: #ef5350;
+      --nav-h: 64px;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
     header {
-      background: linear-gradient(135deg, #1a1f2e, #232838);
-      padding: 24px 32px;
-      border-bottom: 1px solid #2a2f3e;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
     }
-    header h1 { font-size: 1.6rem; color: #4fc3f7; font-weight: 700; letter-spacing: -0.5px; }
-    header span { color: #546e7a; font-size: 0.9rem; }
+    header h1 { font-size: 1.25rem; color: var(--accent); font-weight: 700; }
+    header small { color: var(--muted); font-size: 0.78rem; }
 
-    .container { max-width: 1200px; margin: 0 auto; padding: 32px 16px; }
+    main { flex: 1; overflow-y: auto; padding-bottom: calc(var(--nav-h) + 8px); }
 
-    .search-card {
-      background: #1a1f2e;
-      border: 1px solid #2a2f3e;
-      border-radius: 12px;
-      padding: 28px;
-      margin-bottom: 28px;
+    /* ── Bottom nav ── */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; height: var(--nav-h); z-index: 20;
     }
-    .search-card h2 { font-size: 1rem; color: #78909c; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 0.78rem; color: #78909c; text-transform: uppercase; letter-spacing: 0.5px; }
-    input {
-      background: #0f1117;
-      border: 1px solid #2a2f3e;
-      border-radius: 8px;
-      color: #e0e0e0;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color 0.2s;
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 4px; cursor: pointer; border: none;
+      background: none; color: var(--muted); font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.15s;
+      padding: 8px 4px;
     }
-    input:focus { border-color: #4fc3f7; }
-    input::placeholder { color: #37474f; }
+    .nav-btn .icon { font-size: 1.4rem; line-height: 1; }
+    .nav-btn.active { color: var(--accent); }
+    .nav-btn.active .icon { filter: drop-shadow(0 0 6px var(--accent)); }
 
-    .fontes { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
-    .fonte-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-    .fonte-check input[type=checkbox] { accent-color: #4fc3f7; width: 15px; height: 15px; }
-    .fonte-check span { font-size: 0.85rem; color: #b0bec5; }
+    /* ── Tabs ── */
+    .tab { display: none; padding: 16px; max-width: 960px; margin: 0 auto; width: 100%; }
+    .tab.active { display: block; }
 
-    .btn-buscar {
-      margin-top: 20px;
-      background: linear-gradient(135deg, #0288d1, #4fc3f7);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 12px 32px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
+    /* ── Section titles ── */
+    .section-title { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+    /* ── Config cards (Buscar tab) ── */
+    .busca-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;
     }
-    .btn-buscar:hover { opacity: 0.85; }
-    .btn-buscar:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .stats-bar {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 20px;
-      font-size: 0.85rem;
-      color: #78909c;
+    .busca-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .busca-nome { font-weight: 700; font-size: 1rem; color: var(--text); }
+    .busca-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .busca-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      font-size: 0.7rem; padding: 3px 8px; border-radius: 20px;
+      background: #1e2535; border: 1px solid var(--border); color: var(--muted);
     }
-    .stats-bar strong { color: #4fc3f7; }
-
-    .resultados-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
+    .btn-executar {
+      width: 100%; padding: 11px; border-radius: 8px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #0277bd, var(--accent)); color: #fff;
+      font-weight: 700; font-size: 0.9rem; letter-spacing: 0.3px; transition: opacity 0.2s;
     }
+    .btn-executar:hover { opacity: 0.85; }
+    .btn-executar:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* ── Empty state ── */
+    .empty {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .empty .big-icon { font-size: 3.5rem; }
+    .empty p { font-size: 0.9rem; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: linear-gradient(135deg, #0277bd, var(--accent)); color: #fff;
+      border: none; border-radius: 8px; padding: 12px 24px; font-size: 0.9rem;
+      font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-icon {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); cursor: pointer; padding: 7px 10px; font-size: 1rem;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-icon:hover { color: var(--text); border-color: var(--text); }
+    .btn-danger { border-color: var(--red); color: var(--red); }
+    .btn-danger:hover { color: var(--red); border-color: var(--red); background: rgba(239,83,80,.1); }
+
+    /* ── Results filter bar ── */
+    .filter-bar {
+      display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;
+    }
+    .filter-bar select, .filter-bar input {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 8px 12px; font-size: 0.85rem; outline: none;
+      min-width: 0; flex: 1;
+    }
+    .filter-bar select { max-width: 160px; }
+    .filter-bar .btn-icon { flex-shrink: 0; }
+
+    /* ── Car card ── */
     .car-card {
-      background: #1a1f2e;
-      border: 1px solid #2a2f3e;
-      border-radius: 10px;
-      overflow: hidden;
-      transition: transform 0.15s, border-color 0.15s;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      margin-bottom: 12px; overflow: hidden; transition: border-color 0.15s;
     }
-    .car-card:hover { transform: translateY(-3px); border-color: #4fc3f7; }
+    .car-card:hover { border-color: var(--accent); }
+    .car-card-inner { display: flex; gap: 0; }
 
-    .car-img {
-      width: 100%;
-      height: 160px;
-      object-fit: cover;
-      background: #0f1117;
+    .car-thumb {
+      width: 110px; min-width: 110px; height: 90px; object-fit: cover;
+      background: var(--bg); flex-shrink: 0;
     }
-    .car-img-placeholder {
-      width: 100%;
-      height: 160px;
-      background: linear-gradient(135deg, #1a1f2e, #0f1117);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2.5rem;
+    .car-thumb-ph {
+      width: 110px; min-width: 110px; height: 90px; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; flex-shrink: 0;
+    }
+    @media (min-width: 600px) {
+      .car-thumb, .car-thumb-ph { width: 150px; min-width: 150px; height: 110px; }
     }
 
-    .car-body { padding: 14px 16px; }
-    .car-titulo { font-size: 0.9rem; font-weight: 600; color: #cfd8dc; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .car-preco { font-size: 1.2rem; font-weight: 700; color: #4fc3f7; margin-bottom: 8px; }
-    .car-info { display: flex; gap: 10px; font-size: 0.75rem; color: #546e7a; flex-wrap: wrap; }
-    .car-info span { display: flex; align-items: center; gap: 4px; }
-
-    .car-footer { padding: 10px 16px; border-top: 1px solid #2a2f3e; display: flex; justify-content: space-between; align-items: center; }
-    .fonte-badge {
-      font-size: 0.7rem;
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-weight: 600;
+    .car-body { flex: 1; padding: 10px 12px; min-width: 0; }
+    .car-titulo {
+      font-size: 0.88rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;
     }
+    .car-preco { font-size: 1.15rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .car-fipe { font-size: 0.78rem; font-weight: 600; margin-bottom: 4px; }
+    .fipe-ok { color: var(--green); }
+    .fipe-bad { color: var(--red); }
+    .car-meta { display: flex; gap: 8px; font-size: 0.75rem; color: var(--muted); flex-wrap: wrap; }
+
+    .car-score {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 10px 12px; min-width: 52px; flex-shrink: 0; border-left: 1px solid var(--border);
+    }
+    .score-num { font-size: 1.3rem; font-weight: 800; line-height: 1; }
+    .score-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; color: var(--muted); }
+    .score-a { color: var(--green); }
+    .score-b { color: var(--yellow); }
+    .score-c { color: var(--orange); }
+    .score-d { color: var(--red); }
+
+    .car-footer {
+      padding: 8px 12px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .car-footer-left { display: flex; align-items: center; gap: 6px; }
+
+    .fonte-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 20px; font-weight: 700; }
     .fonte-WebMotors { background: #1b3a5c; color: #4fc3f7; }
     .fonte-OLX { background: #3a2a0a; color: #ffb300; }
     .fonte-iCarros { background: #1b3a1b; color: #66bb6a; }
     .fonte-MercadoLivre { background: #1a2e1a; color: #a5d6a7; }
 
-    .btn-ver {
-      font-size: 0.78rem;
-      color: #4fc3f7;
-      text-decoration: none;
-      font-weight: 600;
-    }
+    .btn-fav { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 2px 4px; }
+    .btn-ver { font-size: 0.78rem; color: var(--accent); text-decoration: none; font-weight: 700; }
     .btn-ver:hover { text-decoration: underline; }
 
-    .loading { text-align: center; padding: 60px; color: #546e7a; }
+    /* ── Loading ── */
+    .loading { text-align: center; padding: 48px; color: var(--muted); }
     .spinner {
-      width: 36px; height: 36px;
-      border: 3px solid #2a2f3e;
-      border-top-color: #4fc3f7;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .erro-msg { background: #2a1a1a; border: 1px solid #c62828; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.85rem; color: #ef9a9a; }
-    .empty-state { text-align: center; padding: 60px; color: #546e7a; }
+    /* ── Erros ── */
+    .error-box {
+      background: #2a1a1a; border: 1px solid var(--red); border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 10px; font-size: 0.82rem; color: #ef9a9a;
+    }
+
+    /* ── Config list ── */
+    .config-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .config-item-info { flex: 1; min-width: 0; }
+    .config-item-nome { font-weight: 700; font-size: 0.95rem; }
+    .config-item-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .config-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .fab {
+      position: fixed; bottom: calc(var(--nav-h) + 16px); right: 20px;
+      background: linear-gradient(135deg, #0277bd, var(--accent)); color: #fff;
+      border: none; border-radius: 50%; width: 52px; height: 52px; font-size: 1.5rem;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(79,195,247,.4); z-index: 15;
+      display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;
+    }
+    .fab:hover { opacity: 0.85; }
+
+    /* ── Modal ── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      z-index: 100; align-items: flex-end; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal-box {
+      background: var(--surface); border-radius: 20px 20px 0 0; width: 100%; max-width: 700px;
+      max-height: 92vh; overflow-y: auto; padding: 20px 20px 32px;
+    }
+    @media (min-width: 700px) {
+      #modal-overlay { align-items: center; }
+      #modal-box { border-radius: 16px; max-height: 85vh; }
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 1.1rem; font-weight: 700; }
+    .btn-close { background: none; border: none; color: var(--muted); font-size: 1.4rem; cursor: pointer; }
+
+    /* ── Form ── */
+    .form-section { margin-bottom: 20px; }
+    .form-section-title { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    .form-grid.one { grid-template-columns: 1fr; }
+    .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.span2 { grid-column: span 2; }
+    label { font-size: 0.75rem; color: var(--muted); }
+    input[type=text], input[type=number], select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 10px 12px; font-size: 16px; outline: none;
+      transition: border-color 0.2s; width: 100%;
+    }
+    input[type=text]:focus, input[type=number]:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    select option { background: var(--surface); }
+
+    /* ── FIPE row ── */
+    .fipe-row { display: flex; gap: 8px; align-items: flex-end; }
+    .fipe-row .form-group { flex: 1; }
+    .btn-fipe {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--accent); padding: 10px 14px; font-size: 0.8rem; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0; font-weight: 600; transition: background 0.15s;
+    }
+    .btn-fipe:hover { background: var(--bg); }
+
+    /* ── Chips (cores) ── */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--muted); font-size: 0.78rem; cursor: pointer;
+      transition: all 0.15s; user-select: none;
+    }
+    .chip.selected { border-color: var(--accent); background: rgba(79,195,247,.15); color: var(--accent); }
+
+    /* ── Checkboxes (fontes) ── */
+    .fonte-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+    .check-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem; color: var(--text); }
+    .check-label input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+    /* ── Sliders ── */
+    .slider-row { display: flex; flex-direction: column; gap: 10px; }
+    .slider-item { display: flex; flex-direction: column; gap: 4px; }
+    .slider-header { display: flex; justify-content: space-between; align-items: center; }
+    .slider-label { font-size: 0.8rem; color: var(--text); }
+    .slider-val { font-size: 0.8rem; font-weight: 700; color: var(--accent); min-width: 20px; text-align: right; }
+    input[type=range] {
+      width: 100%; accent-color: var(--accent); height: 4px; cursor: pointer;
+    }
+
+    /* ── Save button ── */
+    .btn-save {
+      width: 100%; padding: 14px; border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #0277bd, var(--accent)); color: #fff;
+      font-size: 1rem; font-weight: 700; margin-top: 8px; transition: opacity 0.2s;
+    }
+    .btn-save:hover { opacity: 0.85; }
+
+    /* ── Stats bar ── */
+    .stats-bar { font-size: 0.8rem; color: var(--muted); margin-bottom: 12px; }
+    .stats-bar strong { color: var(--accent); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%);
+      background: #263238; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 20px; font-size: 0.85rem; z-index: 200;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
   </style>
 </head>
 <body>
+<div id="app">
   <header>
     <h1>🚗 SearchCar</h1>
-    <span>Busca de carros em múltiplos sites de revenda</span>
+    <small id="header-sub">Busca inteligente de carros</small>
   </header>
 
-  <div class="container">
-    <div class="search-card">
-      <h2>Filtros de Busca</h2>
-      <div class="form-grid">
+  <main>
+    <!-- TAB: BUSCAR -->
+    <section class="tab active" id="tab-buscar">
+      <p class="section-title">Suas buscas configuradas</p>
+      <div id="busca-list"></div>
+    </section>
+
+    <!-- TAB: RESULTADOS -->
+    <section class="tab" id="tab-resultados">
+      <div class="filter-bar">
+        <select id="filtro-busca" onchange="aplicarFiltros()">
+          <option value="">Todas as buscas</option>
+        </select>
+        <select id="filtro-fonte" onchange="aplicarFiltros()">
+          <option value="">Todas as fontes</option>
+          <option value="MercadoLivre">MercadoLivre</option>
+          <option value="OLX">OLX</option>
+          <option value="WebMotors">WebMotors</option>
+          <option value="iCarros">iCarros</option>
+        </select>
+        <select id="filtro-favoritos" onchange="aplicarFiltros()">
+          <option value="">Todos</option>
+          <option value="true">Favoritos</option>
+        </select>
+        <button class="btn-icon" onclick="loadResultados()" title="Atualizar">⟳</button>
+        <button class="btn-icon btn-danger" onclick="confirmarLimpar()" title="Limpar">🗑</button>
+      </div>
+      <div id="stats-bar" class="stats-bar"></div>
+      <div id="resultados-list"></div>
+    </section>
+
+    <!-- TAB: CONFIGURAÇÕES -->
+    <section class="tab" id="tab-config">
+      <p class="section-title">Configurações de busca</p>
+      <div id="config-list"></div>
+    </section>
+  </main>
+
+  <nav id="bottom-nav">
+    <button class="nav-btn active" id="nav-buscar" onclick="switchTab('buscar')">
+      <span class="icon">🔍</span>Buscar
+    </button>
+    <button class="nav-btn" id="nav-resultados" onclick="switchTab('resultados')">
+      <span class="icon">📋</span>Resultados
+    </button>
+    <button class="nav-btn" id="nav-config" onclick="switchTab('config')">
+      <span class="icon">⚙️</span>Config
+    </button>
+  </nav>
+</div>
+
+<!-- FAB (aparece nas abas Buscar e Config) -->
+<button class="fab" id="fab-btn" onclick="abrirForm(null)" title="Nova busca">+</button>
+
+<!-- MODAL FORM -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Nova Configuração</span>
+      <button class="btn-close" onclick="fecharModal()">✕</button>
+    </div>
+
+    <input type="hidden" id="form-id" />
+
+    <div class="form-section">
+      <p class="form-section-title">Informações básicas</p>
+      <div class="form-grid one">
+        <div class="form-group">
+          <label>Nome da busca</label>
+          <input type="text" id="f-nome" placeholder="Ex: HB20 em São Paulo" />
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:10px">
         <div class="form-group">
           <label>Marca</label>
-          <input type="text" id="marca" placeholder="Ex: Toyota" />
+          <input type="text" id="f-marca" placeholder="Ex: Hyundai" />
         </div>
         <div class="form-group">
           <label>Modelo</label>
-          <input type="text" id="modelo" placeholder="Ex: Corolla" />
+          <input type="text" id="f-modelo" placeholder="Ex: HB20" />
         </div>
         <div class="form-group">
-          <label>Ano mínimo</label>
-          <input type="number" id="ano_min" placeholder="Ex: 2018" />
-        </div>
-        <div class="form-group">
-          <label>Ano máximo</label>
-          <input type="number" id="ano_max" placeholder="Ex: 2024" />
+          <label>Estado (UF)</label>
+          <select id="f-regiao">
+            <option value="">Qualquer estado</option>
+            <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+            <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+            <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+            <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+            <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+            <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+            <option>SP</option><option>SE</option><option>TO</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Preço máximo (R$)</label>
-          <input type="number" id="preco_max" placeholder="Ex: 80000" />
+          <input type="number" id="f-preco-max" placeholder="Ex: 50000" />
         </div>
       </div>
-
-      <div class="form-group" style="margin-top: 20px;">
-        <label>Fontes</label>
-        <div class="fontes">
-          <label class="fonte-check"><input type="checkbox" value="webmotors" checked /><span>WebMotors</span></label>
-          <label class="fonte-check"><input type="checkbox" value="olx" checked /><span>OLX</span></label>
-          <label class="fonte-check"><input type="checkbox" value="icarros" checked /><span>iCarros</span></label>
-          <label class="fonte-check"><input type="checkbox" value="mercadolivre" checked /><span>MercadoLivre</span></label>
-        </div>
-      </div>
-
-      <button class="btn-buscar" id="btn-buscar" onclick="buscar()">Buscar Carros</button>
     </div>
 
-    <div id="resultado-area"></div>
+    <div class="form-section">
+      <p class="form-section-title">Filtros adicionais</p>
+      <div class="form-grid three">
+        <div class="form-group">
+          <label>Ano mínimo</label>
+          <input type="number" id="f-ano-min" placeholder="Ex: 2018" />
+        </div>
+        <div class="form-group">
+          <label>Ano máximo</label>
+          <input type="number" id="f-ano-max" placeholder="Ex: 2024" />
+        </div>
+        <div class="form-group">
+          <label>KM máximo</label>
+          <input type="number" id="f-km-max" placeholder="Ex: 80000" />
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Máx. horas desde publicação</label>
+        <input type="number" id="f-horas-max" placeholder="Ex: 48 (deixe vazio para ignorar)" />
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Cores preferidas</label>
+        <div class="chips" id="chips-cores">
+          <span class="chip" data-cor="Branco">⬜ Branco</span>
+          <span class="chip" data-cor="Prata">🩶 Prata</span>
+          <span class="chip" data-cor="Preto">⬛ Preto</span>
+          <span class="chip" data-cor="Cinza">🔘 Cinza</span>
+          <span class="chip" data-cor="Vermelho">🔴 Vermelho</span>
+          <span class="chip" data-cor="Azul">🔵 Azul</span>
+          <span class="chip" data-cor="Verde">🟢 Verde</span>
+          <span class="chip" data-cor="Bege">🟤 Bege</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <p class="form-section-title">Fontes de busca</p>
+      <div class="fonte-checks">
+        <label class="check-label"><input type="checkbox" id="fc-wm" value="webmotors" checked /><span>WebMotors</span></label>
+        <label class="check-label"><input type="checkbox" id="fc-olx" value="olx" checked /><span>OLX</span></label>
+        <label class="check-label"><input type="checkbox" id="fc-ic" value="icarros" checked /><span>iCarros</span></label>
+        <label class="check-label"><input type="checkbox" id="fc-ml" value="mercadolivre" checked /><span>MercadoLivre</span></label>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <p class="form-section-title">Preço FIPE de referência</p>
+      <div class="fipe-row">
+        <div class="form-group">
+          <label>Valor FIPE (R$) — deixe vazio para buscar automaticamente</label>
+          <input type="number" id="f-preco-fipe" placeholder="Ex: 65000" />
+        </div>
+        <button class="btn-fipe" onclick="buscarFipe()">🔍 Buscar FIPE</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <p class="form-section-title">Pesos de pontuação (0 = ignorar, 10 = máxima importância)</p>
+      <div class="slider-row">
+        <div class="slider-item">
+          <div class="slider-header">
+            <span class="slider-label">💰 Desconto sobre FIPE</span>
+            <span class="slider-val" id="val-peso-fipe">10</span>
+          </div>
+          <input type="range" id="f-peso-fipe" min="0" max="10" value="10"
+            oninput="document.getElementById('val-peso-fipe').textContent=this.value" />
+        </div>
+        <div class="slider-item">
+          <div class="slider-header">
+            <span class="slider-label">🛣️ Quilometragem baixa</span>
+            <span class="slider-val" id="val-peso-km">5</span>
+          </div>
+          <input type="range" id="f-peso-km" min="0" max="10" value="5"
+            oninput="document.getElementById('val-peso-km').textContent=this.value" />
+        </div>
+        <div class="slider-item">
+          <div class="slider-header">
+            <span class="slider-label">🕐 Publicado recentemente</span>
+            <span class="slider-val" id="val-peso-tempo">5</span>
+          </div>
+          <input type="range" id="f-peso-tempo" min="0" max="10" value="5"
+            oninput="document.getElementById('val-peso-tempo').textContent=this.value" />
+        </div>
+        <div class="slider-item">
+          <div class="slider-header">
+            <span class="slider-label">🎨 Cor preferida</span>
+            <span class="slider-val" id="val-peso-cor">3</span>
+          </div>
+          <input type="range" id="f-peso-cor" min="0" max="10" value="3"
+            oninput="document.getElementById('val-peso-cor').textContent=this.value" />
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-save" onclick="salvarConfig()">Salvar configuração</button>
   </div>
+</div>
 
-  <script>
-    async function buscar() {
-      const marca = document.getElementById('marca').value;
-      const modelo = document.getElementById('modelo').value;
-      const ano_min = document.getElementById('ano_min').value;
-      const ano_max = document.getElementById('ano_max').value;
-      const preco_max = document.getElementById('preco_max').value;
-      const checks = document.querySelectorAll('.fontes input:checked');
-      const fontes = Array.from(checks).map(c => c.value).join(',');
+<div id="toast"></div>
 
-      const btn = document.getElementById('btn-buscar');
-      btn.disabled = true;
-      btn.textContent = 'Buscando...';
+<script>
+const $ = id => document.getElementById(id);
+let configs = [];
+let resultados = [];
+let editingId = null;
 
-      document.getElementById('resultado-area').innerHTML = `
-        <div class="loading">
-          <div class="spinner"></div>
-          <p>Buscando nos sites selecionados...</p>
-        </div>`;
+// ── Init ──────────────────────────────────────────────────────────────
+async function init() {
+  await loadConfigs();
+  await loadResultados();
+  setupChips();
+}
 
-      const params = new URLSearchParams();
-      if (marca) params.set('marca', marca);
-      if (modelo) params.set('modelo', modelo);
-      if (ano_min) params.set('ano_min', ano_min);
-      if (ano_max) params.set('ano_max', ano_max);
-      if (preco_max) params.set('preco_max', preco_max);
-      params.set('fontes', fontes || 'webmotors,olx,icarros,mercadolivre');
+function setupChips() {
+  $('chips-cores').querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('selected'));
+  });
+}
 
-      try {
-        const resp = await fetch(`/buscar?${params.toString()}`);
-        const data = await resp.json();
-        renderResultados(data);
-      } catch (e) {
-        document.getElementById('resultado-area').innerHTML = `<div class="erro-msg">Erro ao buscar: ${e.message}</div>`;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Buscar Carros';
-      }
+// ── Tabs ──────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  $(`tab-${tab}`).classList.add('active');
+  $(`nav-${tab}`).classList.add('active');
+  $('fab-btn').style.display = (tab === 'resultados') ? 'none' : 'flex';
+}
+
+// ── Configs ───────────────────────────────────────────────────────────
+async function loadConfigs() {
+  try {
+    configs = await fetch('/configs').then(r => r.json());
+    renderBuscarTab();
+    renderConfigTab();
+    populateFiltroSelect();
+  } catch(e) {
+    showToast('Erro ao carregar configurações');
+  }
+}
+
+function renderBuscarTab() {
+  const el = $('busca-list');
+  if (!configs.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="big-icon">🚗</div>
+        <p>Nenhuma busca configurada ainda.</p>
+        <button class="btn-primary" onclick="abrirForm(null)">Criar primeira busca</button>
+      </div>`;
+    return;
+  }
+  el.innerHTML = configs.map(c => `
+    <div class="busca-card">
+      <div class="busca-card-header">
+        <div>
+          <div class="busca-nome">${c.nome}</div>
+          <div class="busca-sub">${c.marca} ${c.modelo}${c.regiao ? ' • ' + c.regiao : ''}</div>
+        </div>
+      </div>
+      <div class="busca-tags">
+        ${c.preco_max ? `<span class="tag">até R$ ${fmt(c.preco_max)}</span>` : ''}
+        ${c.km_max ? `<span class="tag">até ${fmt(c.km_max)} km</span>` : ''}
+        ${c.ano_min || c.ano_max ? `<span class="tag">${c.ano_min || '?'} – ${c.ano_max || 'atual'}</span>` : ''}
+        ${c.preco_fipe ? `<span class="tag">FIPE R$ ${fmt(c.preco_fipe)}</span>` : ''}
+      </div>
+      <button class="btn-executar" id="btn-run-${c.id}" onclick="executarBusca(${c.id})">
+        ▶ Executar busca
+      </button>
+    </div>`).join('');
+}
+
+function renderConfigTab() {
+  const el = $('config-list');
+  if (!configs.length) {
+    el.innerHTML = `<div class="empty"><p>Nenhuma configuração.</p></div>`;
+    return;
+  }
+  el.innerHTML = configs.map(c => `
+    <div class="config-item">
+      <div class="config-item-info">
+        <div class="config-item-nome">${c.nome}</div>
+        <div class="config-item-sub">${c.marca} ${c.modelo}${c.regiao ? ' • ' + c.regiao : ''} • pesos: FIPE=${c.peso_fipe} KM=${c.peso_km}</div>
+      </div>
+      <div class="config-item-actions">
+        <button class="btn-icon" onclick="abrirForm(${c.id})" title="Editar">✏️</button>
+        <button class="btn-icon btn-danger" onclick="deletarConfig(${c.id})" title="Excluir">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+function populateFiltroSelect() {
+  const sel = $('filtro-busca');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todas as buscas</option>' +
+    configs.map(c => `<option value="${c.id}"${cur==c.id?' selected':''}>${c.nome}</option>`).join('');
+}
+
+async function deletarConfig(id) {
+  if (!confirm('Excluir esta configuração?')) return;
+  await fetch(`/configs/${id}`, {method: 'DELETE'});
+  showToast('Configuração removida');
+  loadConfigs();
+}
+
+// ── Busca ─────────────────────────────────────────────────────────────
+async function executarBusca(configId) {
+  const btn = $(`btn-run-${configId}`);
+  btn.disabled = true;
+  btn.textContent = '⏳ Buscando...';
+  try {
+    const data = await fetch(`/busca/executar/${configId}`, {method: 'POST'}).then(r => r.json());
+    if (data.erros?.length) {
+      data.erros.forEach(e => showToast(`⚠️ ${e.fonte}: ${e.erro}`, 4000));
+    }
+    resultados = await fetch('/busca/anuncios').then(r => r.json());
+    renderResultados();
+    populateFiltroSelect();
+    showToast(`✅ ${data.total} resultado(s) encontrado(s)`);
+    switchTab('resultados');
+  } catch(e) {
+    showToast('Erro ao executar busca');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Executar busca';
+  }
+}
+
+// ── Resultados ────────────────────────────────────────────────────────
+async function loadResultados() {
+  try {
+    const params = new URLSearchParams();
+    const buscaId = $('filtro-busca').value;
+    const fonte = $('filtro-fonte').value;
+    const fav = $('filtro-favoritos').value;
+    if (buscaId) params.set('busca_id', buscaId);
+    if (fonte) params.set('fonte', fonte);
+    if (fav === 'true') params.set('favorito', 'true');
+    resultados = await fetch('/busca/anuncios?' + params).then(r => r.json());
+    renderResultados();
+  } catch(e) {
+    showToast('Erro ao carregar resultados');
+  }
+}
+
+function aplicarFiltros() { loadResultados(); }
+
+function renderResultados() {
+  const el = $('resultados-list');
+  const stats = $('stats-bar');
+  if (!resultados.length) {
+    stats.innerHTML = '';
+    el.innerHTML = `<div class="empty"><div class="big-icon">📭</div><p>Nenhum resultado. Execute uma busca primeiro.</p></div>`;
+    return;
+  }
+  const total = resultados.length;
+  const comScore = resultados.filter(r => r.score > 0).length;
+  stats.innerHTML = `<strong>${total}</strong> anúncio(s)${comScore ? ` • <strong>${comScore}</strong> com score` : ''}`;
+
+  el.innerHTML = resultados.map(car => {
+    const preco = car.preco ? `R$ ${fmt(car.preco)}` : 'Consulte';
+    const scoreClass = car.score >= 80 ? 'score-a' : car.score >= 60 ? 'score-b' : car.score >= 40 ? 'score-c' : 'score-d';
+    const scoreNum = car.score != null ? Math.round(car.score) : '—';
+
+    let fipeHtml = '';
+    if (car.desconto_fipe_pct != null) {
+      const ok = car.desconto_fipe_pct >= 0;
+      const sinal = ok ? '↓' : '↑';
+      const cls = ok ? 'fipe-ok' : 'fipe-bad';
+      fipeHtml = `<div class="car-fipe ${cls}">${sinal}${Math.abs(car.desconto_fipe_pct)}% ${ok ? 'abaixo' : 'acima'} da FIPE</div>`;
     }
 
-    function renderResultados(data) {
-      const { resultados, total, erros } = data;
-      let html = '';
+    const meta = [
+      car.km ? `🛣️ ${fmt(car.km)} km` : '',
+      (car.cidade || car.estado) ? `📍 ${[car.cidade, car.estado].filter(Boolean).join('/')}` : '',
+      car.ano ? `📅 ${car.ano}` : '',
+      car.cor ? `🎨 ${car.cor}` : '',
+    ].filter(Boolean).join(' &nbsp; ');
 
-      if (erros && erros.length > 0) {
-        erros.forEach(e => {
-          html += `<div class="erro-msg">⚠️ ${e.fonte}: ${e.erro}</div>`;
-        });
-      }
+    const imgHtml = car.imagem
+      ? `<img class="car-thumb" src="${esc(car.imagem)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="car-thumb-ph" style="display:none">🚗</div>`
+      : `<div class="car-thumb-ph">🚗</div>`;
 
-      if (!resultados || resultados.length === 0) {
-        html += `<div class="empty-state"><p>Nenhum resultado encontrado.</p></div>`;
-        document.getElementById('resultado-area').innerHTML = html;
-        return;
-      }
+    return `
+      <div class="car-card" id="card-${car.id}">
+        <div class="car-card-inner">
+          ${imgHtml}
+          <div class="car-body">
+            <div class="car-titulo" title="${esc(car.titulo)}">${esc(car.titulo)}</div>
+            <div class="car-preco">${preco}</div>
+            ${fipeHtml}
+            <div class="car-meta">${meta}</div>
+          </div>
+          <div class="car-score">
+            <span class="score-num ${scoreClass}">${scoreNum}</span>
+            <span class="score-label">pts</span>
+          </div>
+        </div>
+        <div class="car-footer">
+          <div class="car-footer-left">
+            <span class="fonte-badge fonte-${car.fonte}">${car.fonte}</span>
+            <button class="btn-fav" onclick="toggleFavorito(${car.id})" title="Favoritar">${car.favorito ? '⭐' : '☆'}</button>
+          </div>
+          <a class="btn-ver" href="${esc(car.url)}" target="_blank" rel="noopener">Ver anúncio →</a>
+        </div>
+      </div>`;
+  }).join('');
+}
 
-      html += `<div class="stats-bar"><span>Total: <strong>${total}</strong> anúncios encontrados</span></div>`;
-      html += `<div class="resultados-grid">`;
+async function toggleFavorito(id) {
+  const data = await fetch(`/busca/anuncios/${id}/favorito`, {method: 'PUT'}).then(r => r.json());
+  const car = resultados.find(r => r.id === id);
+  if (car) car.favorito = data.favorito;
+  renderResultados();
+}
 
-      resultados.forEach(car => {
-        const preco = car.preco ? `R$ ${Number(car.preco).toLocaleString('pt-BR')}` : 'Consulte';
-        const img = car.imagem
-          ? `<img class="car-img" src="${car.imagem}" alt="${car.titulo}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="car-img-placeholder" style="display:none">🚗</div>`
-          : `<div class="car-img-placeholder">🚗</div>`;
+async function confirmarLimpar() {
+  const buscaId = $('filtro-busca').value;
+  const msg = buscaId ? 'Limpar os resultados desta busca (exceto favoritos)?' : 'Limpar todos os resultados (exceto favoritos)?';
+  if (!confirm(msg)) return;
+  const qs = buscaId ? `?busca_id=${buscaId}` : '';
+  await fetch(`/busca/anuncios${qs}`, {method: 'DELETE'});
+  showToast('Resultados limpos');
+  loadResultados();
+}
 
-        html += `
-          <div class="car-card">
-            ${img}
-            <div class="car-body">
-              <div class="car-titulo" title="${car.titulo}">${car.titulo}</div>
-              <div class="car-preco">${preco}</div>
-              <div class="car-info">
-                ${car.km ? `<span>📍 ${Number(car.km).toLocaleString('pt-BR')} km</span>` : ''}
-                ${car.cidade ? `<span>🏙 ${car.cidade}</span>` : ''}
-                ${car.ano ? `<span>📅 ${car.ano}</span>` : ''}
-              </div>
-            </div>
-            <div class="car-footer">
-              <span class="fonte-badge fonte-${car.fonte}">${car.fonte}</span>
-              <a class="btn-ver" href="${car.url}" target="_blank" rel="noopener">Ver anúncio →</a>
-            </div>
-          </div>`;
-      });
+// ── Modal / Form ──────────────────────────────────────────────────────
+function abrirForm(configId) {
+  editingId = configId;
+  $('modal-title').textContent = configId ? 'Editar Configuração' : 'Nova Configuração';
+  resetForm();
 
-      html += `</div>`;
-      document.getElementById('resultado-area').innerHTML = html;
+  if (configId) {
+    const c = configs.find(x => x.id === configId);
+    if (c) preencherForm(c);
+  }
+
+  $('modal-overlay').classList.add('open');
+}
+
+function fecharModal() {
+  $('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+function resetForm() {
+  ['f-nome','f-marca','f-modelo','f-preco-max','f-ano-min','f-ano-max','f-km-max','f-horas-max','f-preco-fipe'].forEach(id => $(id).value = '');
+  $('f-regiao').value = '';
+  $('f-peso-fipe').value = 10; $('val-peso-fipe').textContent = '10';
+  $('f-peso-km').value = 5;   $('val-peso-km').textContent = '5';
+  $('f-peso-tempo').value = 5; $('val-peso-tempo').textContent = '5';
+  $('f-peso-cor').value = 3;  $('val-peso-cor').textContent = '3';
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  ['fc-wm','fc-olx','fc-ic','fc-ml'].forEach(id => $(id).checked = true);
+}
+
+function preencherForm(c) {
+  $('f-nome').value = c.nome || '';
+  $('f-marca').value = c.marca || '';
+  $('f-modelo').value = c.modelo || '';
+  $('f-regiao').value = c.regiao || '';
+  $('f-preco-max').value = c.preco_max || '';
+  $('f-ano-min').value = c.ano_min || '';
+  $('f-ano-max').value = c.ano_max || '';
+  $('f-km-max').value = c.km_max || '';
+  $('f-horas-max').value = c.horas_max_anuncio || '';
+  $('f-preco-fipe').value = c.preco_fipe || '';
+
+  $('f-peso-fipe').value = c.peso_fipe; $('val-peso-fipe').textContent = c.peso_fipe;
+  $('f-peso-km').value = c.peso_km;     $('val-peso-km').textContent = c.peso_km;
+  $('f-peso-tempo').value = c.peso_tempo; $('val-peso-tempo').textContent = c.peso_tempo;
+  $('f-peso-cor').value = c.peso_cor;   $('val-peso-cor').textContent = c.peso_cor;
+
+  const coresSel = c.cores_preferidas || [];
+  document.querySelectorAll('.chip').forEach(chip => {
+    if (coresSel.includes(chip.dataset.cor)) chip.classList.add('selected');
+  });
+
+  const fontes = (c.fontes || '').split(',');
+  $('fc-wm').checked = fontes.includes('webmotors');
+  $('fc-olx').checked = fontes.includes('olx');
+  $('fc-ic').checked = fontes.includes('icarros');
+  $('fc-ml').checked = fontes.includes('mercadolivre');
+}
+
+async function salvarConfig() {
+  const nome = $('f-nome').value.trim();
+  const marca = $('f-marca').value.trim();
+  const modelo = $('f-modelo').value.trim();
+  if (!nome || !marca || !modelo) { showToast('Preencha Nome, Marca e Modelo'); return; }
+
+  const cores = Array.from(document.querySelectorAll('.chip.selected')).map(c => c.dataset.cor);
+  const fontes = ['fc-wm','fc-olx','fc-ic','fc-ml']
+    .filter(id => $(id).checked)
+    .map(id => $(id).value)
+    .join(',') || 'mercadolivre';
+
+  const payload = {
+    nome, marca, modelo,
+    regiao: $('f-regiao').value || null,
+    preco_max: num($('f-preco-max').value),
+    ano_min: num($('f-ano-min').value),
+    ano_max: num($('f-ano-max').value),
+    km_max: num($('f-km-max').value),
+    horas_max_anuncio: num($('f-horas-max').value),
+    preco_fipe: num($('f-preco-fipe').value),
+    peso_fipe: +$('f-peso-fipe').value,
+    peso_km: +$('f-peso-km').value,
+    peso_tempo: +$('f-peso-tempo').value,
+    peso_cor: +$('f-peso-cor').value,
+    cores_preferidas: cores,
+    fontes,
+  };
+
+  const url = editingId ? `/configs/${editingId}` : '/configs';
+  const method = editingId ? 'PUT' : 'POST';
+  await fetch(url, {method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  fecharModal();
+  showToast(editingId ? 'Configuração atualizada' : 'Configuração criada');
+  loadConfigs();
+}
+
+async function buscarFipe() {
+  const marca = $('f-marca').value.trim();
+  const modelo = $('f-modelo').value.trim();
+  const ano = $('f-ano-min').value || $('f-ano-max').value;
+  if (!marca || !modelo) { showToast('Preencha marca e modelo antes'); return; }
+  showToast('Buscando na tabela FIPE...');
+  try {
+    const ps = new URLSearchParams({marca, modelo});
+    if (ano) ps.set('ano', ano);
+    const data = await fetch(`/busca/fipe?${ps}`).then(r => r.json());
+    if (data.preco_fipe) {
+      $('f-preco-fipe').value = data.preco_fipe;
+      showToast(`FIPE: R$ ${fmt(data.preco_fipe)}`);
+    } else {
+      showToast('Não encontrado na tabela FIPE');
     }
-  </script>
+  } catch(e) {
+    showToast('Erro ao buscar FIPE');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function fmt(n) { return Number(n).toLocaleString('pt-BR'); }
+function num(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
+function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function showToast(msg, ms = 2500) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// Fechar modal clicando fora
+$('modal-overlay').addEventListener('click', e => {
+  if (e.target === $('modal-overlay')) fecharModal();
+});
+
+init();
+</script>
 </body>
 </html>
